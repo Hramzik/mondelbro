@@ -28,9 +28,10 @@ const size_t MDL_WINDOW_HEIGHT = 360;
 const size_t MDL_PIXEL_COUNT   = MDL_WINDOW_WIDTH * MDL_WINDOW_HEIGHT;
 
 
-const double MDL_ZOOM_FACTOR = 1.2; // > 1
-const double MDL_MOVE_FACTOR = 0.2; // 1 == move by full width / height
+const double MDL_ZOOM_FACTOR = 1.05; // > 1
+const double MDL_MOVE_FACTOR = 0.02; // 1 == move by full width / height
 
+const size_t PICTURE_GENERATIONS_COUNT = 1;
 
 //--------------------------------------------------
 
@@ -127,7 +128,10 @@ typedef struct Fps_handler {
 
 //--------------------------------------------------
 
-extern Pixel_color* calculate_mdl_colors (void* result, double x0, double y0, size_t width, size_t height, double unit_distance);
+extern Pixel_color* calculate_mdl_colors_ver1 (void* result, double x0, double y0, size_t width, size_t height, double unit_distance);
+extern Pixel_color* calculate_mdl_colors_ver2 (void* result, double x0, double y0, size_t width, size_t height, double unit_distance);
+extern Pixel_color* calculate_mdl_colors_ver3 (void* result, double x0, double y0, size_t width, size_t height, double unit_distance);
+extern Pixel_color* calculate_mdl_colors_ver4 (void* result, double x0, double y0, size_t width, size_t height, double unit_distance);
 
 
 //--------------------------------------------------
@@ -165,7 +169,6 @@ double my_min (double val1, double val2);
 
 //--------------------------------------------------
 
-
 Fps_handler* fps_handler_ctor          (void);
 Return_code  fps_handler_dtor          (Fps_handler* handler);
 Return_code  fps_handler_next_frame    (Fps_handler* handler);
@@ -173,6 +176,12 @@ double       fps_handler_get_delay_ms  (Fps_handler* handler);
 double       fps_handler_get_fps       (Fps_handler* handler);
 double       fps_handler_get_avg_delay (Fps_handler* handler);
 double       fps_handler_get_avg_fps   (Fps_handler* handler);
+
+//--------------------------------------------------
+
+Return_code mdl_render_picture_v2        (Mdl* mdl);
+SDL_Surface* mdl_generate_result_surface (Mdl* mdl);
+SDL_Texture* mdl_generate_result_texture (Mdl* mdl);
 
 //--------------------------------------------------
 #endif

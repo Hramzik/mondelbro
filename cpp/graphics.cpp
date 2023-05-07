@@ -136,11 +136,14 @@ Return_code mdl_work (Mdl* mdl) {
     //--------------------------------------------------
 
 
-        mdl_generate_picture (mdl);
+        for (size_t i = 0; i < PICTURE_GENERATIONS_COUNT; i++) {
+
+            mdl_generate_picture (mdl);
+        }
 
 
-        SDL_RenderClear (mdl->output->renderer);
-        mdl_render_picture   (mdl);
+        SDL_RenderClear       (mdl->output->renderer);
+        mdl_render_picture_v2 (mdl);
 
 
         SDL_RenderPresent (mdl->output->renderer);
@@ -150,10 +153,10 @@ Return_code mdl_work (Mdl* mdl) {
 
 
 
-        if (fps_counter->frame_number == 1 || fps_counter->frame_number == 100 || fps_counter->frame_number == 1000) {
-        printf ("frame number = %zd, avg fps = %10lf, avg delay = %lf\n", fps_counter->frame_number, fps_handler_get_avg_fps  (fps_counter), fps_handler_get_avg_delay (fps_counter));
+        if (fps_counter->frame_number == 1 || fps_counter->frame_number == 10 || fps_counter->frame_number == 1000) {
 
             printf ("cur fps = %10lf, cur delay = %lf\n", fps_handler_get_fps (fps_counter), fps_handler_get_delay_ms (fps_counter));
+            printf ("frame number = %zd, avg fps = %10lf, avg delay = %lf\n", fps_counter->frame_number, fps_handler_get_avg_fps  (fps_counter), fps_handler_get_avg_delay (fps_counter));
         }
     }
 
@@ -174,7 +177,7 @@ Return_code mdl_generate_picture (Mdl* mdl) {
     double y0 = mdl->data.y_top;
 
 
-    calculate_mdl_colors (mdl->picture.pixels, x0, y0, MDL_WINDOW_WIDTH, MDL_WINDOW_HEIGHT, mdl->data.unit_distance);
+    calculate_mdl_colors_ver4 (mdl->picture.pixels, x0, y0, MDL_WINDOW_WIDTH, MDL_WINDOW_HEIGHT, mdl->data.unit_distance);
 
 
     return SUCCESS;
@@ -385,8 +388,8 @@ Return_code mdl_handle_conditions (Mdl* mdl) {
     if (!mdl) { LOG_ERROR (BAD_ARGS); return BAD_ARGS; }
 
 
-    if (mdl->conditions.zoom_in)   { mdl_zoom (mdl, mdl->data.unit_distance / MDL_ZOOM_FACTOR); return SUCCESS; }
-    if (mdl->conditions.zoom_out)  { mdl_zoom (mdl, mdl->data.unit_distance * MDL_ZOOM_FACTOR); return SUCCESS; }
+    if (mdl->conditions.zoom_in)   { mdl_zoom (mdl, mdl->data.unit_distance / MDL_ZOOM_FACTOR); /* return SUCCESS; */ }
+    if (mdl->conditions.zoom_out)  { mdl_zoom (mdl, mdl->data.unit_distance * MDL_ZOOM_FACTOR); /* return SUCCESS; */ }
 
     if (mdl->conditions.move_left)  mdl->data.x_left -= MDL_WINDOW_WIDTH  * mdl->data.unit_distance * MDL_MOVE_FACTOR;
     if (mdl->conditions.move_right) mdl->data.x_left += MDL_WINDOW_WIDTH  * mdl->data.unit_distance * MDL_MOVE_FACTOR;
@@ -484,4 +487,86 @@ double fps_handler_get_avg_fps (Fps_handler* handler) {
 
     return handler->sum_fps / (double) handler->frame_number;
 }
+
+
+//--------------------------------------------------
+//    new rendering using surfaces
+
+
+
+Return_code mdl_render_picture_v2 (Mdl* mdl) {
+
+    if (!mdl) { LOG_ERROR (BAD_ARGS); return BAD_ARGS; }
+
+
+    SDL_Texture* result_texture = mdl_generate_result_texture (mdl);
+
+
+    SDL_RenderCopy (mdl->output->renderer, result_texture, nullptr, nullptr);
+
+
+    SDL_DestroyTexture (result_texture);
+
+
+    return SUCCESS;
+}
+
+
+SDL_Surface* mdl_generate_result_surface (Mdl* mdl) {
+
+    if (!mdl) { LOG_ERROR (BAD_ARGS); return nullptr; }
+
+
+    void* buffer = mdl->picture.pixels;
+
+    int width  = MDL_WINDOW_WIDTH;
+    int height = MDL_WINDOW_HEIGHT;
+
+    int depth = 32;
+    int pitch = width * 4; // 4 = bytes per color
+
+    Uint32 rmask = 0; // default mask
+    Uint32 gmask = 0;
+    Uint32 bmask = 0;
+    Uint32 amask = 0;
+
+
+    SDL_Surface* result_surface = SDL_CreateRGBSurfaceFrom (buffer, width, height, depth, pitch, 
+                                                            rmask,  gmask, bmask,  amask);
+
+
+    if (!result_surface) {
+
+        LOG_MESSAGE ("Unable to create surface!");
+        return nullptr;
+    }
+
+
+    return result_surface;
+}
+
+
+SDL_Texture* mdl_generate_result_texture (Mdl* mdl) {
+
+    if (!mdl) { LOG_ERROR (BAD_ARGS); return nullptr; }
+
+
+    SDL_Surface* temp_surface = mdl_generate_result_surface (mdl);
+    if (!temp_surface) { LOG_ERROR (CRITICAL); return nullptr; }
+
+
+    SDL_Texture* result_texture = SDL_CreateTextureFromSurface (mdl->output->renderer, temp_surface);
+    SDL_FreeSurface (temp_surface);
+
+
+    if (!result_texture) {
+
+        LOG_MESSAGE ("Unable to create texture!");
+        return nullptr;
+    }
+
+
+    return result_texture;
+}
+
 

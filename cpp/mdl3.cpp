@@ -2,14 +2,14 @@
 
 //--------------------------------------------------
 
-#include "../hpp/mdl2.hpp"
+#include "../hpp/mdl3.hpp"
 
 //--------------------------------------------------
 
 
 // version 2
 
-Pixel_color* calculate_mdl_colors (void* result_void_ptr, double x0, double y0, size_t width, size_t height, double unit_distance) { // point = top-left
+Pixel_color* calculate_mdl_colors_ver3 (void* result_void_ptr, double x0, double y0, size_t width, size_t height, double unit_distance) { // point = top-left
 
     Pixel_color* result = (Pixel_color*) result_void_ptr;
 
@@ -18,16 +18,26 @@ Pixel_color* calculate_mdl_colors (void* result_void_ptr, double x0, double y0, 
 
     for (size_t num_y = 0; num_y < height; num_y++) {
 
-        for (size_t num_x = 0; num_x < width; num_x += 4) {
+        size_t num_x = 0;
+
+        for (/*size_t num_x = 0*/; num_x < width - 3; num_x += 4) { // new
 
             double x = x0 + (double) num_x * unit_distance;
             double y = y0 - (double) num_y * unit_distance;
 
-            size_t amount = width - num_x; if (amount > 4) amount = 4;
+            calculate_mdl_color_ver3 ( { x, y }, unit_distance, result + point_number);
 
-            calculate_mdl_color_ver2 ( { x, y }, unit_distance, result + point_number, amount);
+            point_number += 4;
+        }
 
-            point_number += amount;
+        for (/*size_t num_x = 0*/; num_x < width; num_x++) { // old
+
+            double x = x0 + (double) num_x * unit_distance;
+            double y = y0 - (double) num_y * unit_distance;
+
+            result [point_number] = calculate_mdl_color_ver1 ( { x, y } );
+
+            point_number += 4;;
         }
     }
 
@@ -35,16 +45,19 @@ Pixel_color* calculate_mdl_colors (void* result_void_ptr, double x0, double y0, 
     return result;
 }
 
-Return_code calculate_mdl_color_ver2 (Point point, double unit_distance, Pixel_color* result, size_t amount) {
+Return_code calculate_mdl_color_ver3 (Point point, double unit_distance, Pixel_color* result) {
 
     if (!result) { LOG_ERROR (BAD_ARGS); return BAD_ARGS; }
 
 
-    Point bases [4] = { point, { point.x + unit_distance,     point.y },
-                               { point.x + unit_distance * 2, point.y },
-                               { point.x + unit_distance * 3, point.y } };
+    double bases_x [4] = { point.x, point.x + unit_distance,
+                                    point.x + unit_distance * 2,
+                                    point.x + unit_distance * 3 };
 
-    Point  curent_coords [4] = { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }};
+    double bases_y [4] = { point.y, point.y, point.y, point.y };
+
+    double curent_x      [4] = { 0, 0, 0, 0 };
+    double curent_y      [4] = { 0, 0, 0, 0 };
     double temp1         [4] = { 0, 0, 0, 0 };
     double temp2         [4] = { 0, 0, 0, 0 };
     size_t op_nums       [4] = { 1, 1, 1, 1 };
@@ -55,28 +68,28 @@ Return_code calculate_mdl_color_ver2 (Point point, double unit_distance, Pixel_c
 
     do {
 
-        for (size_t i = 0; i < amount; i++) temp1 [i] = curent_coords [i].x; // save x coord
+        qdouble_set (temp1, curent_x); // save x coord
 
 
-        for (size_t i = 0; i < amount; i++) curent_coords [i].x *= curent_coords [i].x; // xn+1
-        for (size_t i = 0; i < amount; i++) temp2         [i]    = curent_coords [i].y; // temp2 = y*y
-        for (size_t i = 0; i < amount; i++) temp2         [i]   *= curent_coords [i].y;
-        for (size_t i = 0; i < amount; i++) curent_coords [i].x -= temp2 [i];
-        for (size_t i = 0; i < amount; i++) curent_coords [i].x += bases [i].x;
+        qdouble_mul (curent_x, curent_x); // xn+1
+        qdouble_set (temp2,    curent_y); // temp2 = y*y
+        qdouble_mul (temp2,    curent_y);
+        qdouble_sub (curent_x, temp2   );
+        qdouble_add (curent_x, bases_x );
 
-        for (size_t i = 0; i < amount; i++) curent_coords [i].y *= 2;         // yn+1
-        for (size_t i = 0; i < amount; i++) curent_coords [i].y *= temp1 [i]; // *= xn
-        for (size_t i = 0; i < amount; i++) curent_coords [i].y += bases [i].y;
-
-
-        for (size_t i = 0; i < amount; i++) rs_squared [i]  = curent_coords [i].x; // r^2 = x^2
-        for (size_t i = 0; i < amount; i++) rs_squared [i] *= curent_coords [i].x;
-        for (size_t i = 0; i < amount; i++) temp1      [i]  = curent_coords [i].y; // y^2
-        for (size_t i = 0; i < amount; i++) temp1      [i] *= curent_coords [i].y;
-        for (size_t i = 0; i < amount; i++) rs_squared [i] += temp1         [i]; // r^2 = x^2 + y^2
+        qdouble_add (curent_y, curent_y); // yn+1 = 2 * y_n
+        qdouble_mul (curent_y, temp1   ); // *= xn
+        qdouble_add (curent_y, bases_y );
 
 
-        for (size_t i = 0; i < amount; i++) { // r^2 > 4?
+        qdouble_set (rs_squared, curent_x); // r^2 = x^2
+        qdouble_mul (rs_squared, curent_x);
+        qdouble_set (temp1,      curent_y); // y^2
+        qdouble_mul (temp1,      curent_y);
+        qdouble_add (rs_squared, temp1   ); // r^2 = x^2 + y^2
+
+
+        for (size_t i = 0; i < 4; i++) { // r^2 > 4?
 
             if (rs_squared [i] >  CRITICAL_POINT_RADIUS_SQUARED) finished [i] = true;
             if (op_nums    [i] >= CRITICAL_NUMBER_OF_OPERATIONS) finished [i] = true;
@@ -87,7 +100,7 @@ Return_code calculate_mdl_color_ver2 (Point point, double unit_distance, Pixel_c
 
         finished_all = true;
 
-        for (size_t i = 0; i < amount; i++) { // finished all?
+        for (size_t i = 0; i < 4; i++) { // finished all?
 
             finished_all &= finished [i];
         }
@@ -97,54 +110,10 @@ Return_code calculate_mdl_color_ver2 (Point point, double unit_distance, Pixel_c
 
     //--------------------------------------------------
 
-    //printf ("op nums: ");
-    //for (size_t i = 0; i < amount; i++) printf ("%zd ", op_nums [i]);
-    //printf ("\n");
-    double coefficients [4] = { 0, 0, 0, 0 };
 
-    for (size_t i = 0; i < amount; i++) {
-        coefficients [i] = (double) op_nums [i] / (double) CRITICAL_NUMBER_OF_OPERATIONS;
- //printf ("%zd = %lf\n", i, coefficients [i]);
-    }
+    for (size_t i = 0; i < 4; i++) {
 
-
-    unsigned char red [4] = { 0, 0, 0, 0 };
-
-    for (size_t i = 0; i < amount; i++) {
-
-        red [i] = (unsigned char) (255 * coefficients [i]);
-    }
-
-
-    unsigned char green [4] = { 0, 0, 0, 0 };
-
-    for (size_t i = 0; i < amount; i++) {
-
-        green [i] = (unsigned char) (255 * coefficients [i]);
-    }
-
-
-    unsigned char blue [4] = { 0, 0, 0, 0 };
-
-    for (size_t i = 0; i < amount; i++) {
-
-        blue [i] = (unsigned char) (255 * coefficients [i]);
-    }
-
-
-    Pixel_color* results [4] = { result, result, result, result };
-
-    for (size_t i = 0; i < amount; i++) {
-
-        results [i] += i;
-    }
-
-
-    for (size_t i = 0; i < amount; i++) {
-
-        results [i]->red   = red [i];
-        results [i]->green = green [i];
-        results [i]->blue  = blue [i];
+        result [i] = calculate_mdl_color_ver1_get_color (op_nums [i]);
     }
 
 
@@ -152,4 +121,51 @@ Return_code calculate_mdl_color_ver2 (Point point, double unit_distance, Pixel_c
 }
 
 
-Return_code set (double)
+
+inline Return_code qdouble_set (double* dst, double* src) {
+
+    if (!dst || !src) return BAD_ARGS;
+
+
+    for (size_t i = 0; i < 4; i++) dst [i] = src [i];
+
+
+    return SUCCESS;
+}
+
+
+inline Return_code qdouble_mul (double* dst, double* src) {
+
+    if (!dst || !src) return BAD_ARGS;
+
+
+    for (size_t i = 0; i < 4; i++) dst [i] *= src [i];
+
+
+    return SUCCESS;
+}
+
+
+inline Return_code qdouble_add (double* dst, double* src) {
+
+    if (!dst || !src) return BAD_ARGS;
+
+
+    for (size_t i = 0; i < 4; i++) dst [i] += src [i];
+
+
+    return SUCCESS;
+}
+
+
+inline Return_code qdouble_sub (double* dst, double* src) {
+
+    if (!dst || !src) return BAD_ARGS;
+
+
+    for (size_t i = 0; i < 4; i++) dst [i] -= src [i];
+
+
+    return SUCCESS;
+}
+
